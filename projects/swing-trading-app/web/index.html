@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swing Trading App (GitHub Pages)</title>
+  <style>
+    body { background:#0f172a; color:#e2e8f0; font-family:Arial,sans-serif; margin:0; }
+    .container { padding:20px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .card { background:#1e293b; border-radius:10px; padding:16px; }
+    input,button,select { padding:8px; border-radius:6px; border:none; margin:4px 0; }
+    button { background:#2563eb; color:white; cursor:pointer; }
+    .mono { font-family:monospace; white-space:pre-wrap; background:#020617; padding:10px; border-radius:8px; }
+    h1 { margin:0 0 12px 0; }
+    small { color:#94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card" style="grid-column:1 / span 2;">
+      <h1>Swing Trading App (Deployed on GitHub Pages)</h1>
+      <small>Fully client-side mode for free hosting via GitHub Actions + GitHub Pages.</small>
+    </div>
+
+    <div class="card">
+      <h3>Scanner</h3>
+      <input id="rvol" value="1.5" type="number" step="0.1" />
+      <input id="perf20" value="5" type="number" step="0.1" />
+      <input id="rs" value="70" type="number" step="1" />
+      <label><input id="ma" type="checkbox" checked/> Bullish MA Stack</label>
+      <button onclick="runScanner()">Run Scan</button>
+      <div id="scannerOut" class="mono">No results yet.</div>
+    </div>
+
+    <div class="card">
+      <h3>Risk / Position Sizing</h3>
+      <input id="equity" type="number" value="50000" />
+      <input id="riskPct" type="number" value="1" step="0.1" />
+      <input id="entry" type="number" value="100" step="0.01" />
+      <input id="stop" type="number" value="95" step="0.01" />
+      <button onclick="calcRisk()">Calculate</button>
+      <div id="riskOut" class="mono">No calculation yet.</div>
+    </div>
+
+    <div class="card">
+      <h3>Watchlist</h3>
+      <input id="wlSymbol" placeholder="Ticker (e.g. NVDA)" />
+      <select id="wlStage"><option>watch</option><option>ready</option><option>triggered</option><option>active</option><option>closed</option></select>
+      <button onclick="addWatchlist()">Add</button>
+      <div id="watchOut" class="mono"></div>
+    </div>
+
+    <div class="card">
+      <h3>Trade Journal + Analytics</h3>
+      <input id="tSymbol" value="NVDA" />
+      <input id="tSetup" value="breakout" />
+      <input id="tEntry" type="number" value="100" />
+      <input id="tStop" type="number" value="95" />
+      <input id="tTarget" type="number" value="115" />
+      <input id="tQty" type="number" value="100" />
+      <button onclick="createTrade()">Log Trade</button>
+      <input id="closeId" type="number" placeholder="Trade ID to close" />
+      <input id="closePrice" type="number" placeholder="Exit price" />
+      <button onclick="closeTrade()">Close Trade</button>
+      <button onclick="refreshState()">Refresh</button>
+      <div id="tradeOut" class="mono"></div>
+      <div id="analyticsOut" class="mono"></div>
+    </div>
+  </div>
+
+<script>
+const seedSymbols = [
+  {symbol:'NVDA', sector:'Technology', price:125.4, rel_volume:2.4, ma20:121.2, ma50:114.3, ma200:95.7, perf_20d:14.8, rel_strength:92},
+  {symbol:'SMCI', sector:'Technology', price:92.3, rel_volume:1.9, ma20:88.0, ma50:84.2, ma200:71.9, perf_20d:17.3, rel_strength:87},
+  {symbol:'AAPL', sector:'Technology', price:201.1, rel_volume:1.1, ma20:198.2, ma50:194.4, ma200:183.0, perf_20d:5.9, rel_strength:70},
+  {symbol:'LLY', sector:'Healthcare', price:890.0, rel_volume:1.7, ma20:870.0, ma50:845.0, ma200:760.0, perf_20d:10.2, rel_strength:84},
+  {symbol:'XOM', sector:'Energy', price:109.0, rel_volume:0.9, ma20:108.5, ma50:110.1, ma200:106.2, perf_20d:-3.1, rel_strength:40}
+];
+
+const store = {
+  get(key, fallback){ try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } },
+  set(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+};
+
+function runScanner(){
+  const minRvol = Number(document.getElementById('rvol').value);
+  const minPerf20 = Number(document.getElementById('perf20').value);
+  const minRs = Number(document.getElementById('rs').value);
+  const ma = document.getElementById('ma').checked;
+  const matches = seedSymbols.filter(s => s.rel_volume >= minRvol && s.perf_20d >= minPerf20 && s.rel_strength >= minRs)
+    .filter(s => !ma || (s.ma20 > s.ma50 && s.ma50 > s.ma200))
+    .map(s => ({...s, score: Number(((s.rel_strength*0.6)+(s.perf_20d*2)+(s.rel_volume*5)).toFixed(2))}))
+    .sort((a,b) => b.score-a.score);
+  document.getElementById('scannerOut').innerText = JSON.stringify({count:matches.length, matches}, null, 2);
+}
+
+function calcRisk(){
+  const equity = Number(document.getElementById('equity').value);
+  const riskPct = Number(document.getElementById('riskPct').value);
+  const entry = Number(document.getElementById('entry').value);
+  const stop = Number(document.getElementById('stop').value);
+  const dist = Math.abs(entry-stop);
+  if (!dist) { document.getElementById('riskOut').innerText = JSON.stringify({error:'Entry and stop must differ'}, null, 2); return; }
+  const riskAmount = equity*(riskPct/100);
+  const qty = riskAmount/dist;
+  document.getElementById('riskOut').innerText = JSON.stringify({risk_amount:riskAmount, stop_distance:dist, quantity:qty, position_value:qty*entry}, null, 2);
+}
+
+function addWatchlist(){
+  const items = store.get('watchlist', []);
+  items.unshift({id: Date.now(), symbol: document.getElementById('wlSymbol').value.toUpperCase(), stage: document.getElementById('wlStage').value, note: ''});
+  store.set('watchlist', items);
+  refreshState();
+}
+
+function createTrade(){
+  const trades = store.get('trades', []);
+  const t = {
+    id: Date.now(), symbol: document.getElementById('tSymbol').value.toUpperCase(), setup_tag: document.getElementById('tSetup').value,
+    entry_price: Number(document.getElementById('tEntry').value), stop_price: Number(document.getElementById('tStop').value), target_price: Number(document.getElementById('tTarget').value),
+    quantity: Number(document.getElementById('tQty').value), status:'open', exit_price:null, pnl:null, r_multiple:null
+  };
+  trades.unshift(t);
+  store.set('trades', trades);
+  document.getElementById('tradeOut').innerText = JSON.stringify({id:t.id, status:'open'}, null, 2);
+  refreshState();
+}
+
+function closeTrade(){
+  const id = Number(document.getElementById('closeId').value);
+  const exit = Number(document.getElementById('closePrice').value);
+  const trades = store.get('trades', []);
+  const t = trades.find(x => x.id === id);
+  if (!t) { document.getElementById('tradeOut').innerText = JSON.stringify({error:'Trade not found'}, null, 2); return; }
+  if (t.status !== 'open') { document.getElementById('tradeOut').innerText = JSON.stringify({error:'Trade already closed'}, null, 2); return; }
+  t.exit_price = exit;
+  t.status = 'closed';
+  t.pnl = (t.exit_price - t.entry_price) * t.quantity;
+  const denom = (t.entry_price - t.stop_price) * t.quantity;
+  t.r_multiple = denom ? (t.pnl / denom) : 0;
+  store.set('trades', trades);
+  document.getElementById('tradeOut').innerText = JSON.stringify({id:t.id,pnl:t.pnl,r_multiple:t.r_multiple}, null, 2);
+  refreshState();
+}
+
+function refreshState(){
+  const watch = store.get('watchlist', []);
+  const trades = store.get('trades', []);
+  document.getElementById('watchOut').innerText = JSON.stringify(watch, null, 2);
+  document.getElementById('tradeOut').innerText = JSON.stringify(trades, null, 2);
+  const closed = trades.filter(t => t.status === 'closed');
+  if (!closed.length) {
+    document.getElementById('analyticsOut').innerText = JSON.stringify({total_closed:0,win_rate:0,expectancy_r:0,avg_pnl:0,max_drawdown:0}, null, 2);
+    return;
+  }
+  const pnls = closed.map(t => t.pnl || 0);
+  const rs = closed.map(t => t.r_multiple || 0);
+  const winRate = 100 * pnls.filter(p => p>0).length / pnls.length;
+  const avgPnl = pnls.reduce((a,b)=>a+b,0)/pnls.length;
+  const expectancy = rs.reduce((a,b)=>a+b,0)/rs.length;
+  let eq=0, peak=0, dd=0;
+  for (const p of pnls){ eq+=p; peak=Math.max(peak,eq); dd=Math.max(dd,peak-eq); }
+  document.getElementById('analyticsOut').innerText = JSON.stringify({total_closed:closed.length, win_rate:winRate, expectancy_r:expectancy, avg_pnl:avgPnl, max_drawdown:dd}, null, 2);
+}
+
+refreshState();
+</script>
+</body>
+</html>
