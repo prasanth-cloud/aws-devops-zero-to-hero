@@ -1,6 +1,6 @@
 # Swing Trading App (Functional MVP)
 
-This deliverable is now a **runnable application** with:
+This deliverable is a **runnable application** with:
 - Smart stock scanner
 - Risk/position sizing engine
 - Watchlist management
@@ -13,7 +13,29 @@ This deliverable is now a **runnable application** with:
 - HTML/JS frontend served from the backend
 - Docker deployment support
 
-## Run locally
+## Can deployment be automatic?
+Yes — for local/server deployment I added a one-command script:
+
+```bash
+cd projects/swing-trading-app
+./deploy.sh docker   # preferred (Docker)
+# or
+./deploy.sh local    # runs with local python in background
+```
+
+Stop everything:
+
+```bash
+./deploy.sh stop
+```
+
+After deploy, open `http://localhost:8000`.
+
+## Do you need to do anything?
+- **For local deployment**: just run `./deploy.sh docker` (or `local`).
+- **For cloud deployment (AWS/GCP/etc.)**: you still need to provide cloud credentials/account access. I can prepare/apply IaC if credentials are available.
+
+## Manual run (without script)
 
 ```bash
 cd projects/swing-trading-app
@@ -22,7 +44,7 @@ python -m src.main
 
 Open: `http://localhost:8000`
 
-## Deploy with Docker
+## Deploy with Docker (manual)
 
 ```bash
 cd projects/swing-trading-app
