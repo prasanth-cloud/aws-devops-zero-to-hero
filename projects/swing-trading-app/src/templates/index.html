@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swing Trading App MVP</title>
+  <style>
+    body { background:#0f172a; color:#e2e8f0; font-family:Arial,sans-serif; margin:0; }
+    .container { padding:20px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .card { background:#1e293b; border-radius:10px; padding:16px; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:8px; border-bottom:1px solid #334155; text-align:left; font-size:13px; }
+    input,button,select { padding:8px; border-radius:6px; border:none; margin:4px 0; }
+    button { background:#2563eb; color:white; cursor:pointer; }
+    .mono { font-family:monospace; white-space:pre-wrap; background:#020617; padding:10px; border-radius:8px; }
+    h1 { margin: 0 0 12px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card" style="grid-column:1 / span 2;">
+      <h1>Swing Trading App MVP</h1>
+      <p>Functional modules: scanner, risk sizing, watchlist, trade journal, analytics.</p>
+    </div>
+
+    <div class="card">
+      <h3>Scanner</h3>
+      <label>Min Relative Volume</label><br/>
+      <input id="rvol" value="1.5" type="number" step="0.1" />
+      <label>Min 20D Performance %</label><br/>
+      <input id="perf20" value="5" type="number" step="0.1" />
+      <label>Min Relative Strength</label><br/>
+      <input id="rs" value="70" type="number" step="1" />
+      <div><input id="ma" type="checkbox" checked/> Bullish MA Stack</div>
+      <button onclick="runScanner()">Run Scan</button>
+      <div id="scannerOut" class="mono">No results yet.</div>
+    </div>
+
+    <div class="card">
+      <h3>Risk / Position Sizing</h3>
+      <input id="equity" type="number" value="50000" />
+      <input id="riskPct" type="number" value="1" step="0.1" />
+      <input id="entry" type="number" value="100" step="0.01" />
+      <input id="stop" type="number" value="95" step="0.01" />
+      <button onclick="calcRisk()">Calculate</button>
+      <div id="riskOut" class="mono">No calculation yet.</div>
+    </div>
+
+    <div class="card">
+      <h3>Watchlist</h3>
+      <input id="wlSymbol" placeholder="Ticker (e.g. NVDA)" />
+      <select id="wlStage">
+        <option>watch</option><option>ready</option><option>triggered</option><option>active</option><option>closed</option>
+      </select>
+      <button onclick="addWatchlist()">Add</button>
+      <div id="watchOut" class="mono"></div>
+    </div>
+
+    <div class="card">
+      <h3>Trade Journal</h3>
+      <input id="tSymbol" placeholder="Symbol" value="NVDA" />
+      <input id="tSetup" placeholder="Setup" value="breakout" />
+      <input id="tEntry" type="number" value="100" step="0.01" />
+      <input id="tStop" type="number" value="95" step="0.01" />
+      <input id="tTarget" type="number" value="115" step="0.01" />
+      <input id="tQty" type="number" value="100" step="1" />
+      <button onclick="createTrade()">Log Trade</button>
+      <button onclick="loadAnalytics()">Refresh Analytics</button>
+      <div id="tradeOut" class="mono"></div>
+      <div id="analyticsOut" class="mono"></div>
+    </div>
+  </div>
+
+<script>
+async function runScanner(){
+  const body = {
+    min_rel_volume: Number(document.getElementById('rvol').value),
+    min_perf_20d: Number(document.getElementById('perf20').value),
+    min_rel_strength: Number(document.getElementById('rs').value),
+    require_bullish_ma_stack: document.getElementById('ma').checked
+  };
+  const res = await fetch('/api/scanner',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  document.getElementById('scannerOut').innerText = JSON.stringify(await res.json(),null,2);
+}
+async function calcRisk(){
+  const body = {
+    equity:Number(document.getElementById('equity').value),
+    risk_pct:Number(document.getElementById('riskPct').value),
+    entry_price:Number(document.getElementById('entry').value),
+    stop_price:Number(document.getElementById('stop').value)
+  };
+  const res = await fetch('/api/risk/position-size',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  document.getElementById('riskOut').innerText = JSON.stringify(await res.json(),null,2);
+}
+async function addWatchlist(){
+  const body = {symbol:document.getElementById('wlSymbol').value, stage:document.getElementById('wlStage').value};
+  await fetch('/api/watchlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const res = await fetch('/api/watchlist');
+  document.getElementById('watchOut').innerText = JSON.stringify(await res.json(),null,2);
+}
+async function createTrade(){
+  const body = {
+    symbol:document.getElementById('tSymbol').value,
+    setup_tag:document.getElementById('tSetup').value,
+    entry_price:Number(document.getElementById('tEntry').value),
+    stop_price:Number(document.getElementById('tStop').value),
+    target_price:Number(document.getElementById('tTarget').value),
+    quantity:Number(document.getElementById('tQty').value)
+  };
+  const res = await fetch('/api/trades',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  document.getElementById('tradeOut').innerText = JSON.stringify(await res.json(),null,2);
+}
+async function loadAnalytics(){
+  const res = await fetch('/api/analytics/summary');
+  document.getElementById('analyticsOut').innerText = JSON.stringify(await res.json(),null,2);
+}
+</script>
+</body>
+</html>
