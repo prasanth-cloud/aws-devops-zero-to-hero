@@ -1,0 +1,341 @@
+openapi: 3.0.3
+info:
+  title: Swing Trading Platform API
+  version: 0.1.0
+  description: MVP API contract for scanner, watchlist, journal, risk, and analytics.
+servers:
+  - url: https://api.swingapp.example.com/v1
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created
+  /auth/login:
+    post:
+      summary: Login and get tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Auth tokens
+  /scans:
+    get:
+      summary: List user scans
+      responses:
+        '200':
+          description: Scan list
+    post:
+      summary: Create scan preset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanCreateRequest'
+      responses:
+        '201':
+          description: Scan created
+  /scans/{scanId}/run:
+    post:
+      summary: Execute scan
+      parameters:
+        - in: path
+          name: scanId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Scan run queued
+  /scan-runs/{runId}/matches:
+    get:
+      summary: Get scan matches
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Match list
+  /watchlists:
+    get:
+      summary: List watchlists
+      responses:
+        '200':
+          description: Watchlists returned
+    post:
+      summary: Create watchlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatchlistCreateRequest'
+      responses:
+        '201':
+          description: Created
+  /watchlists/{watchlistId}/items:
+    post:
+      summary: Add symbol to watchlist
+      parameters:
+        - in: path
+          name: watchlistId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatchlistItemAddRequest'
+      responses:
+        '201':
+          description: Item added
+  /trade-plans:
+    post:
+      summary: Create trade plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TradePlanCreateRequest'
+      responses:
+        '201':
+          description: Plan created
+  /risk/position-size:
+    post:
+      summary: Calculate position size
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PositionSizeRequest'
+      responses:
+        '200':
+          description: Position size result
+  /trades:
+    post:
+      summary: Log new trade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TradeCreateRequest'
+      responses:
+        '201':
+          description: Trade logged
+    get:
+      summary: List trades with filters
+      responses:
+        '200':
+          description: Trades list
+  /trades/{tradeId}/close:
+    post:
+      summary: Close an open trade
+      parameters:
+        - in: path
+          name: tradeId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TradeCloseRequest'
+      responses:
+        '200':
+          description: Trade closed
+  /analytics/summary:
+    get:
+      summary: Get analytics summary (win rate, expectancy, drawdown)
+      responses:
+        '200':
+          description: KPI payload
+  /research/winners:
+    get:
+      summary: Historical top winners
+      parameters:
+        - in: query
+          name: year
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Winner list
+  /research/replay/{symbol}:
+    get:
+      summary: Replay stream metadata for symbol
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Replay metadata
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 12
+        displayName:
+          type: string
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    ScanCreateRequest:
+      type: object
+      required: [name, filterJson]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        filterJson:
+          type: object
+        isRealtime:
+          type: boolean
+    WatchlistCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        isDynamic:
+          type: boolean
+        dynamicSourceScanId:
+          type: string
+          format: uuid
+    WatchlistItemAddRequest:
+      type: object
+      required: [symbol]
+      properties:
+        symbol:
+          type: string
+        stage:
+          type: string
+          enum: [watch, ready, triggered, active, closed]
+        note:
+          type: string
+    TradePlanCreateRequest:
+      type: object
+      required: [portfolioId, symbol, setupTag, status]
+      properties:
+        portfolioId:
+          type: string
+          format: uuid
+        symbol:
+          type: string
+        setupTag:
+          type: string
+        thesis:
+          type: string
+        triggerPrice:
+          type: number
+        stopPrice:
+          type: number
+        targetPrice:
+          type: number
+        status:
+          type: string
+          enum: [draft, ready, invalidated, executed]
+    PositionSizeRequest:
+      type: object
+      required: [accountEquity, riskPct, entryPrice, stopPrice]
+      properties:
+        accountEquity:
+          type: number
+        riskPct:
+          type: number
+        entryPrice:
+          type: number
+        stopPrice:
+          type: number
+        maxPortfolioHeatPct:
+          type: number
+    TradeCreateRequest:
+      type: object
+      required: [portfolioId, symbol, side, status]
+      properties:
+        portfolioId:
+          type: string
+          format: uuid
+        tradePlanId:
+          type: string
+          format: uuid
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [long, short]
+        entryAt:
+          type: string
+          format: date-time
+        entryPrice:
+          type: number
+        qty:
+          type: number
+        initialStop:
+          type: number
+        setupTag:
+          type: string
+        emotionTag:
+          type: string
+        checklistResultJson:
+          type: object
+        notes:
+          type: string
+        status:
+          type: string
+          enum: [planned, open, partial, closed, canceled]
+    TradeCloseRequest:
+      type: object
+      required: [exitAt, exitPrice]
+      properties:
+        exitAt:
+          type: string
+          format: date-time
+        exitPrice:
+          type: number
+        fees:
+          type: number
+        slippage:
+          type: number
